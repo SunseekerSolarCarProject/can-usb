@@ -1,0 +1,48 @@
+.selected, .send{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: black 1px solid;
+    padding: 20px;
+    margin: 20px;
+}
+
+.one-line {
+    min-width: 150px;
+}
+
+table {
+    margin: 20px;
+}
+
+.form-control {
+    max-width: 200px;
+}
+
+.selectedItem{
+    margin: 0 50px;
+    min-width: 180px;
+}
+
+.actions {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 20px;
+    margin-top: 50px;
+}
+
+.form-group {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0 50px;
+    align-self: flex-start;
+}
+
+.selected-ids {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    margin-left: 20px;
+    width: 100%;
+}

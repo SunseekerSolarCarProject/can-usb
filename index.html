@@ -1,0 +1,458 @@
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>CAN USB</title>
+    <link rel="stylesheet" type="text/css" href="bootstrap.css">
+    <link rel="stylesheet" type="text/css" href="style.scss">
+</head>
+
+<body>
+    <div id="error"></div>
+    <div class="actions">
+        <select class="form-control" id="ports"  onchange="setCom(this.value)"></select>
+        <button class="btn btn-warning" id="openClose" onclick="toggleCan()">Open</button>
+        <!-- <button class="btn btn-warning" onclick="testValues()">Test</button> -->
+        <select class="form-control" onchange="changeConversionType(this.value)">
+            <option selected value="float">Float</option>
+            <option value="int">Int</option>
+            <option value="boolean">Boolean</option>
+        </select>
+    </div>
+    <div class="send">
+        <label class="one-line">Send a message: &nbsp;</label>
+        <input type="text" class="form-control" id="sendid">
+        <div class="form-group">
+            <label>0x</label>
+            <input class="sendItem form-control" id="sendFirst" placeholder="00 00 00 00" oninput="format('sendFirst')" onfocus="updateCount('sendFirst')"></input>
+        </div>
+        <div class="form-group">
+            <label>0x</label>
+            <input class="sendItem form-control" id="sendSecond" placeholder="00 00 00 00" oninput="format('sendSecond')" onfocus="updateCount('sendSecond')"></input>
+        </div>
+        <button type="button" class="btn btn-success" onclick="sendLine()">Send</button>
+    </div>
+    <div class="selected">
+        <label class="one-line">Select an id: &nbsp;</label>
+        <input type="text" class="form-control" id="canid" oninput="clearSelected()">
+        <div class="selected-ids" id="selectedList">
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+    </div>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>Time</th>
+                <th>First</th>
+                <th>Second</th>
+            </tr>
+        </thead>
+        <tbody id="data-table">
+
+        </tbody>
+    </table>
+</body>
+
+<script>
+    const serialport = require('serialport');
+    const ByteBuffer = require('bytebuffer');
+
+    var serial_port;
+
+    var com = '';               // com port used for serial communication
+    var output = '';            // holds the messages from the battery
+
+    var data = {};
+
+    var cType = 'float';
+
+    var startTime = 0;
+
+    var selectedIds = [];
+
+    var sendCount = 0;
+
+    var canOpen = false;
+
+    // gets the com port form the user and starts serial communication
+    function setCom(com) {
+
+        // clear the port buttons
+        var ports = document.getElementById('ports');
+        var success = document.createElement('span');
+        success.innerHTML = "Successful Connection";
+        ports.parentNode.insertBefore(success, ports);
+        ports.parentNode.removeChild(ports);
+        
+        // creates a new connection with the users port
+        var port = new serialport(com, { baudRate: 250 }, function (err) {
+            if (err) {
+                return console.log('Error: ', err.message);
+            }
+        });
+        serial_port = port;
+
+        // open communication
+        port.write('O\r', function (err) {
+            if (err) {
+                return console.log('Error on write: ', err.message);
+            }
+            var button = document.getElementById('openClose').innerText = 'Open';
+            canOpen = true;
+        });
+
+        startTime = new Date();
+
+        // read any data coming in
+        // if end of line send whole line to parse line function and reset output
+        port.on('data', function (data) {
+            if (data) {
+                data.forEach(d => {
+                    if (d == 13) {
+                        parseLine(output);
+                        output = '';
+                    }
+                    else {
+                        output += String.fromCharCode(d);
+                    }
+                })
+            }
+        });
+    
+    }
+
+    // get all serial ports and display them as buttons on to of screen
+    serialport.list((err, ports) => {
+        if (err) {
+            document.getElementById('error').textContent = err.message
+            return
+        } else {
+            document.getElementById('error').textContent = ''
+        }
+
+        if (ports.length === 0) {
+            document.getElementById('error').textContent = 'No ports discovered'
+        }
+
+        var portList = '';
+        portList += makeOption('');
+        ports.forEach(port => {
+            portList += makeOption(port.comName);
+        });
+
+        document.getElementById('ports').innerHTML = portList;
+
+    });
+
+    // make html button for com ports
+    function makeOption(text) {
+        return '<option>' + text + '</option>';
+    }
+
+    // send a line of data
+    function sendLine() {
+        id = document.getElementById('sendid').value;
+        first = document.getElementById('sendFirst').value;
+        first = first.replace(/ /g, '');
+        second = document.getElementById('sendSecond').value;
+        second = second.replace(/ /g, '');
+        serial_port.write('t'+id+8+first+second+'\r', function (err) {
+            if (err) {
+                return console.log('Error on write: ', err.message);
+            }
+        });
+    }
+
+    function toggleCan() {
+        var button = document.getElementById('openClose');
+        if (canOpen) {
+            closeCan();
+            button.innerText = 'Open';
+        }
+        else {
+            openCan();
+            button.innerText = 'Close';
+        }
+        canOpen = !canOpen;
+    }
+
+    function openCan() {
+        serial_port.write('O\r', function (err) {
+            if (err) {
+                return console.log('Error on write: ', err.message);
+            }
+        });
+    }
+    
+    function closeCan() {
+        serial_port.write('C\r', function (err) {
+            if (err) {
+                return console.log('Error on write: ', err.message);
+            }
+        });
+    }
+
+    function testValues(){
+        var i = 0;
+        startTime = new Date();
+        window.setInterval(function() {
+            parseLine(ids[i]);
+            i ++;
+        }, 500)
+    }
+
+    // change the conversion type of data
+    function changeConversionType(type) {
+        cType = type;
+    }
+    
+    // get line and determine where to save it
+    function parseLine(output) {
+        var canid = document.getElementById('canid').value;
+        if (output) {
+            var id = output.substring(1, 4);
+            var first;
+            var second;
+            switch (cType) {
+                case 'float': 
+                    first = getFloat(output.substring(5, 13));
+                    second = getFloat(output.substring(13, 21));
+                    break;
+                case 'int': 
+                    first = getInt(output.substring(5, 13));
+                    second = getInt(output.substring(13, 21));
+                    break;
+                case 'boolean': 
+                    first = getBoolean(output.substring(5, 13));
+                    second = getBoolean(output.substring(13, 21));
+                    break;
+            }
+            updateTable(id, first, second);
+            if (canid.includes('x') && id.substring(0, 2) == canid.substring(0, 2)) {
+                if (isNaN(id%10)) {
+                    selectedIds[getInt(id.substring(2))] = id;
+                }
+                else {
+                    selectedIds[id%10] = id;
+                }
+                var div = document.createElement('div');
+                div.classList.add('form-group');
+                div.innerHTML = id+'<p class="selectedItem">'+first+'</p><p class="selectedItem">'+second+'</p>';
+                var item = document.getElementById('selectedList');
+                if (item.childNodes.length <= selectedIds.indexOf(id)) {
+                    var initialLength = item.childNodes.length;
+                    for (var i = 0; i <= (selectedIds.indexOf(id) - initialLength); i ++) {
+                        var span = document.createElement('span');
+                        item.appendChild(span);
+                    }
+                }
+                item.replaceChild(div, item.childNodes[selectedIds.indexOf(id)]);
+            }
+            else if(id == canid) {
+                var div = document.createElement('div');
+                div.classList.add('form-group');
+                div.innerHTML = id+'<p class="selectedItem">'+first+'</p><p class="selectedItem">'+second+'</p>';
+                var item = document.getElementById('selectedList');
+                item.replaceChild(div, item.childNodes[0]);
+            }
+            else if (canid === '') {
+                var item = document.getElementById('selectedList');
+                var emptySpan = document.createElement('span');
+                item.childNodes.forEach(node => {
+                    item.replaceChild(emptySpan, node);
+                });
+            }
+        }
+    }
+
+    // clear the selected list
+    function clearSelected() {
+        var list = document.getElementById('selectedList');
+        var emptySpan = document.createElement('span');
+        for(var i = 1; i < list.childNodes.length; i++) {
+            list.replaceChild(emptySpan, list.childNodes[i]);
+        }
+    }
+
+    // parse data to float
+    function getFloat(hex) {
+        if (hex.length == 8){
+            var buf = ByteBuffer.fromHex(hex, true);
+            return buf.readFloat().toFixed(4);
+        }
+    }
+
+    function getInt(hex) {
+        return parseInt(hex, 16);
+    }
+
+    function getBoolean(hex) {
+        return (parseInt(hex, 16)).toString(2);
+    }
+
+    function updateTable(id, first, second) {
+        var time = new Date() - startTime;
+        if (data[id]) {
+            var row = document.getElementById(id);
+            if (row) {
+                row.childNodes[1].innerText = time;
+                row.childNodes[2].innerText = first;
+                row.childNodes[3].innerText = second;
+            }
+        }
+        else {
+            appendData(id, time, first, second);
+            data[id] = {first, second};
+        }
+    }
+
+    // adds data to the table
+    function appendData(id, time, first, second){
+        var table = document.getElementById('data-table');
+        var row = document.createElement('tr');
+        row.setAttribute('id', id);
+        row.appendChild(makeCell(id));
+        row.appendChild(makeCell(time))
+        row.appendChild(makeCell(first));
+        row.appendChild(makeCell(second));
+        var inserted = false;
+        if (table.childNodes.length == 1) {
+            table.appendChild(row);
+        }
+        else {
+            for (var c = table.childNodes.length; c > 0 && !inserted; c --) {
+                if (table.childNodes[c] && table.childNodes[c].getAttribute('id') < id) {
+                    if (table.childNodes[c+1]) {
+                        table.insertBefore(row, table.childNodes[c+1]);
+                    }
+                    else {
+                        table.appendChild(row);
+                    }
+                    inserted = true;
+                }
+            }
+            if(inserted == false) {
+                table.insertBefore(row, table.childNodes[1]);
+            }
+        }
+    }
+
+    function makeCell(value){
+        var element = document.createElement('td');
+        element.innerText = value;
+        return element;
+    }
+    
+    // update the send data counter for the formatter
+    function updateCount(id) {
+        var input = document.getElementById(id);
+        sendCount = input.value.length;
+    }
+
+    // format the send data
+    function format(id) {
+        var input = document.getElementById(id);
+        if (input.value.length < sendCount){
+            if ((input.value.length % 3) == 0) {
+                input.value = input.value.substring(0, input.value.length-1);
+            }
+        }
+        else {
+            if (input.value.length > 11) {
+                input.value = input.value.substring(0, 11);
+            }
+            else if (input.value.length == 2 || input.value.length == 5 || input.value.length == 8) {
+                input.value = input.value + ' ';
+            }
+        }
+        sendCount = input.value.length;
+    }
+
+    var ids = [ 't40380000000000000000',
+        't42380000000000000000',
+        't521800409C4600000000',
+        't5228000000000000803F',
+        't5248400000FF00000000',
+        't40380000000000000000',
+        't42380000000000000000',
+        't501800409C4600000000',
+        't5028000000000000803F',
+        't5048400000FF00000000',
+        't40380000000000000000',
+        't42180000000000000000',
+        't4228D3FF004300000000',
+        't42380000000000000000',
+        't42480000000000000000',
+        't42586F2125BEFF8F62BB',
+        't42680000000000000000',
+        't42780000000000000000',
+        't4378FFFFC74200000000',
+        't40180000000000000000',
+        't4028A0E8004300000000',
+        't521800409C4600000000',
+        't40380000000000000000',
+        't5248400000FF00000000',
+        't40480000000000000000',
+        't5228000000000000803F',
+        't40583FB2A3BD7FA5D4BD',
+        't40680000000000000000',
+        't40780000000000000000',
+        't4178FFFFC74200000000',
+        't42380000000000000000',
+        't40380000000000000000',
+        't501800409C4600000000',
+        't5028000000000000803F',
+        't5048400000FF00000000',
+        't42380000000000000000',
+        't40380000000000000000',
+        't42380000000000000000',
+        't521800409C4600000000',
+        't5228000000000000803F',
+        't5248400000FF00000000',
+        't40380000000000000000',
+        't42380000000000000000',
+        't501800409C4600000000',
+        't5028000000000000803F',
+        't5048400000FF00000000',
+        't50080100000062495254',
+        't40380000000000000000',
+        't42080340000035670000',
+        't42180000000000000000',
+        't4228E102014300000000',
+        't42380000000000000000',
+        't42480000000000000000',
+        't42585FDC29BEFF998DBB',
+        't42680000000000000000',
+        't42780000000000000000',
+        't428800000000A1606F41',
+        't4298B0FEED3FCC835440',
+        't42B8C8F5AE41D017C541',
+        't42C85CD3F54100000000',
+        't42D8F305B74400000000',
+        't42E85F2534BD00000000',
+        't4378FFFFC74200000000',
+        't40080340000001000000',
+        't40180000000000000000',
+        't40282AEB004300000000',
+        't521800409C4600000000',
+        't40380000000000000000'];
+       
+</script>
+
+</html>

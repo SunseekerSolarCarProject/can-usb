@@ -1,0 +1,34 @@
+{
+  "name": "CAN USB",
+  "version": "1.0.0",
+  "description": "Reading the data off the can network",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "install": "electron-rebuild",
+    "build": "electron-packager . --platform=win32"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:johnny-five-io/electron-serialport.git"
+  },
+  "keywords": [
+    "Electron",
+    "quick",
+    "start",
+    "tutorial",
+    "demo"
+  ],
+  "author": "GitHub",
+  "license": "CC0-1.0",
+  "devDependencies": {
+    "electron": "^1.8.8",
+    "electron-rebuild": "^1.4.0"
+  },
+  "dependencies": {
+    "bytebuffer": "^5.0.1",
+    "canvas-gauges": "^2.1.5",
+    "electron-packager": "^12.2.0",
+    "serialport": "^7.0.1"
+  }
+}
