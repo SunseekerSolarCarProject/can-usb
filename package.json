@@ -28,7 +28,7 @@
   "dependencies": {
     "bytebuffer": "^5.0.1",
     "canvas-gauges": "^2.1.5",
-    "electron-packager": "^12.2.0",
+    "electron-packager": "^16.0.0",
     "serialport": "^7.0.1"
   }
 }
